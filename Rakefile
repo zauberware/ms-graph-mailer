@@ -2,7 +2,29 @@
 
 require 'bundler/gem_tasks'
 require 'rspec/core/rake_task'
+require 'rubocop/rake_task'
 
 RSpec::Core::RakeTask.new(:spec)
+RuboCop::RakeTask.new
 
-task default: :spec
+task default: %i[rubocop spec]
+
+desc 'Run tests and RuboCop'
+task test: %i[rubocop spec]
+
+namespace :version do
+  desc 'Bump patch version (0.1.0 -> 0.1.1)'
+  task :patch do
+    ruby 'scripts/bump_version.rb patch'
+  end
+
+  desc 'Bump minor version (0.1.0 -> 0.2.0)'
+  task :minor do
+    ruby 'scripts/bump_version.rb minor'
+  end
+
+  desc 'Bump major version (0.1.0 -> 1.0.0)'
+  task :major do
+    ruby 'scripts/bump_version.rb major'
+  end
+end
