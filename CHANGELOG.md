@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `In-Reply-To` and `References` headers are no longer dropped when sending.
+  The JSON `sendMail` payload cannot carry standard internet message headers,
+  so they are now mapped to their MAPI extended properties
+  (`PidTagInReplyToId` / `PidTagInternetReferences`), keeping replies threaded
+  in the recipient's mail client.
+
 ## [1.1.0] - 2026-11-06
 
 ### Added
