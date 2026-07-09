@@ -4,6 +4,10 @@ module MsGraphMailer
   class DeliveryMethod
     include Dry::Monads[:result]
 
+    # PidTagInReplyToId (0x1042) / PidTagInternetReferences (0x1039)
+    IN_REPLY_TO_PROPERTY_ID = 'String 0x1042'
+    REFERENCES_PROPERTY_ID = 'String 0x1039'
+
     attr_reader :settings
 
     # INFO: settings is passed from config.action_mailer.<environment>
@@ -76,12 +80,40 @@ module MsGraphMailer
         ccRecipients: build_recipients(mail.cc),
         bccRecipients: build_recipients(mail.bcc),
         replyTo: build_recipients(mail.reply_to),
-        attachments: build_attachments(mail)
+        attachments: build_attachments(mail),
+        singleValueExtendedProperties: build_threading_properties(mail)
       }.tap do |msg|
-        %i[toRecipients ccRecipients bccRecipients replyTo attachments].each do |field|
+        %i[toRecipients ccRecipients bccRecipients replyTo attachments singleValueExtendedProperties].each do |field|
           msg.delete(field) if msg[field].blank?
         end
       end
+    end
+
+    # Graph's sendMail only accepts x-* custom headers via
+    # internetMessageHeaders, so the standard threading headers
+    # (In-Reply-To/References) would silently get lost. Mapping them to their
+    # MAPI extended properties makes Exchange emit them on the wire, keeping
+    # replies threaded in the recipient's client.
+    def build_threading_properties(mail)
+      properties = []
+
+      in_reply_to = format_message_ids(mail.in_reply_to)
+      references = format_message_ids(mail.references)
+
+      properties << { id: IN_REPLY_TO_PROPERTY_ID, value: in_reply_to } if in_reply_to
+      properties << { id: REFERENCES_PROPERTY_ID, value: references } if references
+      properties
+    end
+
+    # The mail gem parses message-id fields to bare ids (no angle brackets);
+    # the RFC 5322 header format Exchange writes needs them re-added.
+    def format_message_ids(ids)
+      formatted = Array(ids).compact.map(&:to_s).reject(&:empty?).map do |id|
+        id.start_with?('<') ? id : "<#{id}>"
+      end
+      return nil if formatted.empty?
+
+      formatted.join(' ')
     end
 
     def build_body(mail)
