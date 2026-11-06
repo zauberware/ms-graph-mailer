@@ -48,6 +48,9 @@ MsGraphMailer.configure do |config|
   config.client_id = ENV['AZURE_MAIL_APP_CLIENT_ID']
   config.client_secret = ENV['AZURE_MAIL_APP_CLIENT_SECRET']
   config.logger = Rails.logger
+  # Optional: request timeouts in seconds (default: HTTP adapter defaults)
+  config.open_timeout = 10
+  config.timeout = 120
 end
 ```
 
@@ -105,6 +108,21 @@ The gem raises specific exceptions for different error scenarios:
 - `MsGraphMailer::ConfigurationError` - Invalid or missing configuration
 - `MsGraphMailer::AuthenticationError` - OAuth authentication failures
 - `MsGraphMailer::DeliveryError` - Email delivery failures
+
+`DeliveryError` carries the Graph response details so callers can decide whether to retry:
+
+```ruby
+rescue MsGraphMailer::DeliveryError => e
+  e.status            # => 503
+  e.code              # => "CommandConcurrencyLimitReached"
+  e.retry_after       # => 7 (seconds, from the Retry-After header; nil if absent)
+  e.request_id        # => Graph request-id, for Microsoft support
+  e.client_request_id # => id the gem sent with the request (also set on timeouts)
+
+  e.throttled?        # 429/503: Graph rejected the request, nothing was sent - safe to retry
+  e.outcome_unknown?  # other 5xx or network error/timeout - the mail may have been sent
+end
+```
 
 ## Development
 

@@ -28,30 +28,55 @@ module MsGraphMailer
         saveToSentItems: true
       }
 
+      # Sent with the request and echoed back by Graph, so a failure can be
+      # traced with Microsoft even when no response arrives (timeouts).
+      client_request_id = SecureRandom.uuid
+
       response = connection(token_result.value!).post("users/#{CGI.escape(sender_email)}/sendMail") do |req|
         req.headers['Content-Type'] = 'application/json'
+        req.headers['client-request-id'] = client_request_id
+        req.headers['return-client-request-id'] = 'true'
         req.body = message_payload.to_json
       end
 
-      unless response.status == 202
-        error_body = begin
-          JSON.parse(response.body)
-        rescue StandardError
-          {}
-        end
-        error_msg = error_body.dig('error', 'message') || 'Unknown error'
-        logger.error("[MsGraphMailer] sendMail failed: [status: #{response.status}] - [body: #{response.body}]")
-        raise DeliveryError, "Microsoft Graph sendEmail failed with status #{response.status}: #{error_msg}"
-      end
+      raise build_delivery_error(response, client_request_id) unless response.status == 202
 
-      logger.info('[MsGraphMailer] Email sent successfully via Microsoft Graph')
+      logger.info('[MsGraphMailer] Email sent successfully via Microsoft Graph ' \
+                  "[request-id: #{response.headers['request-id']}] [client-request-id: #{client_request_id}]")
       response
     rescue Faraday::Error => e
-      logger.error("[MsGraphMailer] Network error: #{e.message}")
-      raise DeliveryError, "Network error sending email: #{e.message}"
+      logger.error("[MsGraphMailer] Network error: #{e.message} [client-request-id: #{client_request_id}]")
+      raise DeliveryError.new("Network error sending email: #{e.message}",
+                              client_request_id: client_request_id, network_error: true)
     end
 
     private
+
+    def build_delivery_error(response, client_request_id)
+      error = parse_error_body(response.body)
+      request_id = response.headers['request-id']
+      retry_after = DeliveryError.parse_retry_after(response.headers['Retry-After'])
+
+      logger.error("[MsGraphMailer] sendMail failed: [status: #{response.status}] [code: #{error['code']}] " \
+                   "[request-id: #{request_id}] [client-request-id: #{client_request_id}] " \
+                   "[retry-after: #{retry_after.inspect}] - [body: #{response.body}]")
+
+      DeliveryError.new(
+        "Microsoft Graph sendEmail failed with status #{response.status}: #{error['message'] || 'Unknown error'}",
+        status: response.status,
+        code: error['code'],
+        retry_after: retry_after,
+        request_id: request_id,
+        client_request_id: client_request_id
+      )
+    end
+
+    def parse_error_body(body)
+      parsed = JSON.parse(body.to_s)
+      parsed.is_a?(Hash) && parsed['error'].is_a?(Hash) ? parsed['error'] : {}
+    rescue JSON::ParserError
+      {}
+    end
 
     def validate_configuration!
       config = MsGraphMailer.configuration
@@ -133,6 +158,8 @@ module MsGraphMailer
     def connection(access_token)
       @connection ||= Faraday.new(url: 'https://graph.microsoft.com/v1.0/') do |f|
         f.headers['Authorization'] = "Bearer #{access_token}"
+        f.options.open_timeout = MsGraphMailer.configuration&.open_timeout
+        f.options.timeout = MsGraphMailer.configuration&.timeout
         f.adapter Faraday.default_adapter
         # SSL verification configuration
         f.ssl.verify = ssl_verify?
