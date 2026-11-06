@@ -43,6 +43,56 @@ RSpec.describe MsGraphMailer::DeliveryMethod do
     end
   end
 
+  context 'when sending a reply with threading headers' do
+    let(:payloads) { [] }
+    let(:sent_message) { payloads.last }
+
+    before do
+      stub_request(:post, send_url).to_return do |request|
+        payloads << JSON.parse(request.body)['message']
+        { status: 202 }
+      end
+    end
+
+    it 'transmits In-Reply-To and References as MAPI extended properties' do
+      mail['In-Reply-To'] = '<parent@example.com>'
+      mail['References'] = '<root@example.com> <parent@example.com>'
+
+      delivery_method.deliver!(mail)
+
+      expect(sent_message['singleValueExtendedProperties']).to contain_exactly(
+        { 'id' => 'String 0x1042', 'value' => '<parent@example.com>' },
+        { 'id' => 'String 0x1039', 'value' => '<root@example.com> <parent@example.com>' }
+      )
+    end
+
+    it 'wraps bare message ids in angle brackets' do
+      mail.in_reply_to = 'parent@example.com'
+
+      delivery_method.deliver!(mail)
+
+      expect(sent_message['singleValueExtendedProperties']).to contain_exactly(
+        { 'id' => 'String 0x1042', 'value' => '<parent@example.com>' }
+      )
+    end
+
+    it 'omits the extended properties when no threading headers are present' do
+      delivery_method.deliver!(mail)
+
+      expect(sent_message).not_to have_key('singleValueExtendedProperties')
+    end
+
+    it 'sends subject, body and recipients' do
+      delivery_method.deliver!(mail)
+
+      expect(sent_message).to include(
+        'subject' => 'Hello',
+        'body' => include('content' => 'Body'),
+        'toRecipients' => [{ 'emailAddress' => { 'address' => 'recipient@example.com' } }]
+      )
+    end
+  end
+
   context 'when Graph throttles with CommandConcurrencyLimitReached' do
     before do
       stub_request(:post, send_url).to_return(
