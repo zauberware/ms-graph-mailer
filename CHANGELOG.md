@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-11-06
+
+### Added
+
+- `MsGraphMailer::DeliveryError` exposes `status`, `code`, `retry_after`, `request_id` and
+  `client_request_id`, plus `throttled?` (429/503 — rejected, safe to retry) and
+  `outcome_unknown?` (other 5xx and network errors — the mail may have been sent).
+- Every sendMail request carries a generated `client-request-id`; request ids and
+  `Retry-After` are logged on success and failure.
+- `open_timeout` / `timeout` configuration options for the sendMail request.
+
+### Changed
+
+- Error classes moved to `lib/ms/graph/mailer/errors.rb`. Error messages are unchanged.
+
 ## [1.0.0] - 2025-12-15
 
 ### Added
@@ -43,5 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configuration system for tenant, client credentials
 - Integration with Rails logger
 
+[1.1.0]: https://github.com/zauberware/ms-graph-mailer/releases/tag/v1.1.0
 [1.0.0]: https://github.com/zauberware/ms-graph-mailer/releases/tag/v1.0.0
 [0.1.0]: https://github.com/zauberware/ms-graph-mailer/releases/tag/v0.1.0
