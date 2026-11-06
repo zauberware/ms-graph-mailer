@@ -30,11 +30,10 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'securerandom', '>= 0.3'
 
   # Development dependencies
-  spec.add_development_dependency 'bundler', '~> 2.0'
-  spec.add_development_dependency 'rake', '~> 13.0'
-  spec.add_development_dependency 'rspec', '~> 3.0'
-  spec.add_development_dependency 'rubocop', '~> 1.0'
-  spec.add_development_dependency 'rubocop-rake', '~> 0.6'
-  spec.add_development_dependency 'rubocop-rspec', '~> 2.0'
-  spec.add_development_dependency 'webmock', '~> 3.0'
+  spec.add_development_dependency 'rake', '~> 13.4'
+  spec.add_development_dependency 'rspec', '~> 3.13'
+  spec.add_development_dependency 'rubocop', '~> 1.92'
+  spec.add_development_dependency 'rubocop-rake', '~> 0.7'
+  spec.add_development_dependency 'rubocop-rspec', '~> 3.10'
+  spec.add_development_dependency 'webmock', '~> 3.34'
 end
