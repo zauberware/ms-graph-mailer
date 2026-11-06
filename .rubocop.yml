@@ -1,5 +1,9 @@
 # RuboCop configuration for ms-graph-mailer gem
 
+plugins:
+  - rubocop-rake
+  - rubocop-rspec
+
 AllCops:
   NewCops: enable
   TargetRubyVersion: 3.2
@@ -85,3 +89,18 @@ Lint/RaiseException:
 
 Lint/StructNewOverride:
   Enabled: true
+
+# RSpec
+
+# Error specs assert several attributes of one raised error; splitting them
+# into one example per attribute would only repeat the request setup.
+RSpec/MultipleExpectations:
+  Max: 5
+
+RSpec/ExampleLength:
+  Max: 15
+
+# Specs mirror lib/ms/graph/mailer, the namespace is MsGraphMailer.
+RSpec/SpecFilePathFormat:
+  CustomTransform:
+    MsGraphMailer: ms/graph/mailer
